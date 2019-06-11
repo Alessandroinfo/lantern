@@ -1,4 +1,4 @@
-Fork of nisrulz/lantern
+Fork of https://github.com/nisrulz/lantern
 
 Merged fixes from develop into  master and prepared relese 2.0.2 
 
