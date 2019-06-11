@@ -20,21 +20,35 @@ import android.annotation.TargetApi;
 import android.content.Context;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CameraManager.TorchCallback;
 import android.os.Build.VERSION_CODES;
+import android.support.annotation.NonNull;
 
+@TargetApi(VERSION_CODES.M)
 class PostMarshmallow implements FlashController {
 
-    private String cameraId;
-
     private final CameraManager cameraManager;
+    private String cameraId;
+    private boolean torchEnabledFlag = false;
 
-    @TargetApi(VERSION_CODES.LOLLIPOP)
     PostMarshmallow(Context context) {
         cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
         try {
-
-            if (cameraManager != null) {
+            if ((cameraManager != null) && (cameraManager.getCameraIdList().length > 0)) {
                 cameraId = cameraManager.getCameraIdList()[0];
+                cameraManager.registerTorchCallback(new TorchCallback() {
+                    @Override
+                    public void onTorchModeUnavailable(@NonNull final String cameraIdentifier) {
+                        torchEnabledFlag = false;
+                        super.onTorchModeUnavailable(cameraId);
+                    }
+
+                    @Override
+                    public void onTorchModeChanged(@NonNull final String cameraIdentifier, final boolean enabled) {
+                        torchEnabledFlag = enabled;
+                        super.onTorchModeChanged(cameraId, enabled);
+                    }
+                }, null);
             }
 
         } catch (CameraAccessException e) {
@@ -42,7 +56,6 @@ class PostMarshmallow implements FlashController {
         }
     }
 
-    @TargetApi(VERSION_CODES.M)
     @Override
     public void off() {
         try {
@@ -54,7 +67,6 @@ class PostMarshmallow implements FlashController {
         }
     }
 
-    @TargetApi(VERSION_CODES.M)
     @Override
     public void on() {
         try {
@@ -65,5 +77,10 @@ class PostMarshmallow implements FlashController {
             e.printStackTrace();
         }
 
+    }
+
+    @Override
+    public boolean torchEnabled() {
+        return torchEnabledFlag;
     }
 }

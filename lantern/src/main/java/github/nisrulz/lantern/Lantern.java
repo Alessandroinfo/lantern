@@ -16,8 +16,6 @@
 
 package github.nisrulz.lantern;
 
-import static github.nisrulz.lantern.Utils.isMarshmallowAndAbove;
-
 import android.Manifest;
 import android.app.Activity;
 import android.arch.lifecycle.Lifecycle.Event;
@@ -26,8 +24,11 @@ import android.arch.lifecycle.LifecycleOwner;
 import android.arch.lifecycle.OnLifecycleEvent;
 import android.os.Handler;
 import android.support.annotation.RequiresPermission;
+
 import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
+
+import static github.nisrulz.lantern.Utils.isMarshmallowAndAbove;
 
 public class Lantern implements LifecycleObserver {
 
@@ -39,8 +40,6 @@ public class Lantern implements LifecycleObserver {
 
     private final Handler handler;
 
-    private boolean isFlashOn = false;
-
     private long pulseTime = 1000;
 
     private final Utils utils;
@@ -48,8 +47,10 @@ public class Lantern implements LifecycleObserver {
     private final Runnable pulseRunnable = new Runnable() {
         @Override
         public void run() {
-            enableTorchMode(!isFlashOn);
-            handler.postDelayed(pulseRunnable, pulseTime);
+            if(flashController!=null) {
+                enableTorchMode(!flashController.torchEnabled());
+                handler.postDelayed(pulseRunnable, pulseTime);
+            }
         }
     };
 
@@ -92,21 +93,22 @@ public class Lantern implements LifecycleObserver {
     }
 
     public Lantern enableTorchMode(boolean enabled) {
-        if (activityWeakRef != null) {
-            if (enabled) {
-                if (!isFlashOn && utils.checkForCameraPermission(activityWeakRef.get().getApplicationContext())) {
-                    flashController.on();
-                    isFlashOn = true;
+        if(flashController!=null) {
+            if (activityWeakRef != null) {
+                if (enabled) {
+                    if (!flashController.torchEnabled()
+                            && utils.checkForCameraPermission(getActivityRef().getApplicationContext())) {
+                        flashController.on();
+                    }
+                } else {
+                    if (flashController.torchEnabled()
+                            && utils.checkForCameraPermission(getActivityRef().getApplicationContext())) {
+                        flashController.off();
+                    }
                 }
             } else {
-                if (isFlashOn && utils.checkForCameraPermission(activityWeakRef.get().getApplicationContext())) {
-                    flashController.off();
-                    isFlashOn = false;
-                }
+                flashController.off();
             }
-        } else {
-            flashController.off();
-            isFlashOn = false;
         }
         return this;
     }
@@ -123,10 +125,10 @@ public class Lantern implements LifecycleObserver {
     @RequiresPermission(Manifest.permission.CAMERA)
     public boolean initTorch() {
         if (activityWeakRef != null) {
-            if (utils.checkIfCameraFeatureExists(activityWeakRef.get()) && utils
-                    .checkForCameraPermission(activityWeakRef.get())) {
+            if (utils.checkIfCameraFeatureExists(getActivityRef())
+                    && utils.checkForCameraPermission(getActivityRef())) {
                 if (isMarshmallowAndAbove()) {
-                    flashController = new PostMarshmallow(activityWeakRef.get());
+                    flashController = new PostMarshmallow(getActivityRef());
                 } else {
                     flashController = new PreMarshmallow();
                 }
@@ -155,5 +157,22 @@ public class Lantern implements LifecycleObserver {
     public Lantern withDelay(long time, final TimeUnit timeUnit) {
         this.pulseTime = TimeUnit.MILLISECONDS.convert(time, timeUnit);
         return this;
+    }
+
+    /**
+     * Torch Enabled State
+     * @return boolean
+     */
+    @RequiresPermission(Manifest.permission.CAMERA)
+    public boolean isTorchEnabled(){
+        if(initTorch() && flashController!=null) {
+            return flashController.torchEnabled();
+        }
+
+        return false;
+    }
+
+    private Activity getActivityRef(){
+        return activityWeakRef.get();
     }
 }
