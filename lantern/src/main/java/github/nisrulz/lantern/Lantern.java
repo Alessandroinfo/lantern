@@ -16,26 +16,34 @@
 
 package github.nisrulz.lantern;
 
+import static github.nisrulz.lantern.Utils.isMarshmallowAndAbove;
+
 import android.Manifest;
 import android.app.Activity;
-import android.arch.lifecycle.Lifecycle.Event;
-import android.arch.lifecycle.LifecycleObserver;
-import android.arch.lifecycle.LifecycleOwner;
-import android.arch.lifecycle.OnLifecycleEvent;
+import android.content.Context;
 import android.os.Handler;
-import android.support.annotation.RequiresPermission;
+
+import androidx.annotation.Nullable;
+import androidx.annotation.RequiresPermission;
+import androidx.lifecycle.Lifecycle.Event;
+import androidx.lifecycle.LifecycleObserver;
+import androidx.lifecycle.LifecycleOwner;
+import androidx.lifecycle.OnLifecycleEvent;
 
 import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
-
-import static github.nisrulz.lantern.Utils.isMarshmallowAndAbove;
 
 public class Lantern implements LifecycleObserver {
 
     private WeakReference<Activity> activityWeakRef;
 
-    private final DisplayLightController displayLightController;
+    @Nullable
+    private DisplayLightController displayLightController;
 
+    @Nullable
+    private final Context context;
+
+    @Nullable
     private FlashController flashController;
 
     private final Handler handler;
@@ -47,62 +55,87 @@ public class Lantern implements LifecycleObserver {
     private final Runnable pulseRunnable = new Runnable() {
         @Override
         public void run() {
-            if(flashController!=null) {
+            if (flashController != null) {
                 enableTorchMode(!flashController.torchEnabled());
                 handler.postDelayed(pulseRunnable, pulseTime);
             }
         }
     };
 
-
-    public Lantern(Activity activity) {
-        this.activityWeakRef = new WeakReference<>(activity);
+    public Lantern(@Nullable Context context) {
+        this.context = context;
         utils = new Utils();
         handler = new Handler();
-        displayLightController = new DisplayLightControllerImpl(activity);
+    }
+
+    public Lantern setupDisplayController(Activity activity) {
+        this.activityWeakRef = new WeakReference<>(activity);
+        if (displayLightController == null) {
+            displayLightController = new DisplayLightControllerImpl(getActivityRef());
+        }
+        return this;
     }
 
     public Lantern alwaysOnDisplay(boolean enabled) {
-        if (enabled) {
-            displayLightController.enableAlwaysOnMode();
-        } else {
-            displayLightController.disableAlwaysOnMode();
+        if (displayLightController != null) {
+            if (enabled) {
+
+                displayLightController.enableAlwaysOnMode();
+            } else {
+                displayLightController.disableAlwaysOnMode();
+            }
         }
         return this;
     }
 
     public Lantern autoBright(boolean enabled) {
-        if (enabled) {
-            displayLightController.enableAutoBrightMode();
-        } else {
-            displayLightController.disableAutoBrightMode();
+        if (displayLightController != null) {
+            if (enabled) {
+                displayLightController.enableAutoBrightMode();
+            } else {
+                displayLightController.disableAutoBrightMode();
+            }
         }
         return this;
     }
 
     public Lantern checkAndRequestSystemPermission() {
-        displayLightController.requestSystemWritePermission();
+        if (displayLightController != null) {
+            displayLightController.requestSystemWritePermission();
+        }
         return this;
+    }
+
+    public boolean isSystemWritePermissionGranted() {
+        boolean result = false;
+
+        if (displayLightController != null) {
+            result = displayLightController.checkSystemWritePermission();
+        }
+
+        return result;
     }
 
     @OnLifecycleEvent(Event.ON_DESTROY)
     public void cleanup() {
         handler.removeCallbacks(pulseRunnable);
-        displayLightController.cleanup();
+        if (displayLightController != null) {
+            displayLightController.cleanup();
+        }
         this.activityWeakRef = null;
     }
 
     public Lantern enableTorchMode(boolean enabled) {
-        if(flashController!=null) {
-            if (activityWeakRef != null) {
+        if (flashController != null) {
+            if (context != null) {
                 if (enabled) {
                     if (!flashController.torchEnabled()
-                            && utils.checkForCameraPermission(getActivityRef().getApplicationContext())) {
+                            && utils.checkForCameraPermission(context.getApplicationContext())) {
                         flashController.on();
                     }
                 } else {
                     if (flashController.torchEnabled()
-                            && utils.checkForCameraPermission(getActivityRef().getApplicationContext())) {
+                            && utils.checkForCameraPermission(context.getApplicationContext())) {
                         flashController.off();
                     }
                 }
@@ -114,21 +147,23 @@ public class Lantern implements LifecycleObserver {
     }
 
     public Lantern fullBrightDisplay(boolean enabled) {
-        if (enabled) {
-            displayLightController.enableFullBrightMode();
-        } else {
-            displayLightController.disableFullBrightMode();
+        if (displayLightController != null) {
+            if (enabled) {
+                displayLightController.enableFullBrightMode();
+            } else {
+                displayLightController.disableFullBrightMode();
+            }
         }
         return this;
     }
 
     @RequiresPermission(Manifest.permission.CAMERA)
     public boolean initTorch() {
-        if (activityWeakRef != null) {
-            if (utils.checkIfCameraFeatureExists(getActivityRef())
-                    && utils.checkForCameraPermission(getActivityRef())) {
+        if (context != null) {
+            if (utils.checkIfCameraFeatureExists(context)
+                    && utils.checkForCameraPermission(context)) {
                 if (isMarshmallowAndAbove()) {
-                    flashController = new PostMarshmallow(getActivityRef());
+                    flashController = new PostMarshmallow(context);
                 } else {
                     flashController = new PreMarshmallow();
                 }
@@ -161,18 +196,19 @@ public class Lantern implements LifecycleObserver {
 
     /**
      * Torch Enabled State
+     *
      * @return boolean
      */
     @RequiresPermission(Manifest.permission.CAMERA)
-    public boolean isTorchEnabled(){
-        if(initTorch() && flashController!=null) {
+    public boolean isTorchEnabled() {
+        if (initTorch() && flashController != null) {
             return flashController.torchEnabled();
         }
 
         return false;
     }
 
-    private Activity getActivityRef(){
+    private Activity getActivityRef() {
         return activityWeakRef.get();
     }
 }

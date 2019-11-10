@@ -22,19 +22,24 @@ import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraManager.TorchCallback;
 import android.os.Build.VERSION_CODES;
-import android.support.annotation.NonNull;
+
+import androidx.annotation.NonNull;
 
 @TargetApi(VERSION_CODES.M)
 class PostMarshmallow implements FlashController {
 
-    private final CameraManager cameraManager;
     private String cameraId;
+
     private boolean torchEnabledFlag = false;
+
+    private final CameraManager cameraManager;
 
     PostMarshmallow(Context context) {
         cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
         try {
-            if ((cameraManager != null) && (cameraManager.getCameraIdList().length > 0)) {
+            if (checkCameraId()) {
+                assert cameraManager != null;
+
                 cameraId = cameraManager.getCameraIdList()[0];
                 cameraManager.registerTorchCallback(new TorchCallback() {
                     @Override
@@ -59,7 +64,7 @@ class PostMarshmallow implements FlashController {
     @Override
     public void off() {
         try {
-            if (cameraManager != null) {
+            if (checkCameraId()) {
                 cameraManager.setTorchMode(cameraId, false);
             }
         } catch (Exception e) {
@@ -70,7 +75,7 @@ class PostMarshmallow implements FlashController {
     @Override
     public void on() {
         try {
-            if (cameraManager != null) {
+            if (checkCameraId()) {
                 cameraManager.setTorchMode(cameraId, true);
             }
         } catch (Exception e) {
@@ -82,5 +87,18 @@ class PostMarshmallow implements FlashController {
     @Override
     public boolean torchEnabled() {
         return torchEnabledFlag;
+    }
+
+    /**
+     * Check if the camera manager returns a camera id
+     *
+     * @return boolean
+     */
+    private boolean checkCameraId() {
+        try {
+            return (cameraManager != null) && (cameraManager.getCameraIdList().length > 0);
+        } catch (CameraAccessException e) {
+            return false;
+        }
     }
 }
