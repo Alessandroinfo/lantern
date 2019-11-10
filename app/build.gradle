@@ -17,6 +17,9 @@
 apply plugin: 'com.android.application'
 apply from: '../dependencies.gradle'
 
+group='com.github.Alessandroinfo'
+
+
 android {
     compileSdkVersion versions.compileSdk
 

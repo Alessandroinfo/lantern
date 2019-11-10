@@ -16,7 +16,8 @@
 
 apply plugin: 'com.android.library'
 apply from: '../dependencies.gradle'
-apply plugin: 'com.github.dcendents.android-maven'
+
+group='com.github.Alessandroinfo'
 
 android {
     compileSdkVersion versions.compileSdk
